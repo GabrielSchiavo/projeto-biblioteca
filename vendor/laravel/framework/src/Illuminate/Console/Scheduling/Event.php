@@ -26,7 +26,7 @@ class Event
     /**
      * The command string.
      *
-     * @var string
+     * @var string|null
      */
     public $command;
 
@@ -47,7 +47,7 @@ class Event
     /**
      * The user the command should run as.
      *
-     * @var string
+     * @var string|null
      */
     public $user;
 
@@ -80,7 +80,7 @@ class Event
     public $onOneServer = false;
 
     /**
-     * The amount of time the mutex should be valid.
+     * The number of minutes the mutex should be valid.
      *
      * @var int
      */
@@ -138,7 +138,7 @@ class Event
     /**
      * The human readable description of the event.
      *
-     * @var string
+     * @var string|null
      */
     public $description;
 
@@ -148,6 +148,13 @@ class Event
      * @var \Illuminate\Console\Scheduling\EventMutex
      */
     public $mutex;
+
+    /**
+     * The mutex name resolver callback.
+     *
+     * @var \Closure|null
+     */
+    public $mutexNameResolver;
 
     /**
      * The exit status code of the command.
@@ -245,7 +252,11 @@ class Event
     {
         return Process::fromShellCommandline(
             $this->buildCommand(), base_path(), null, null, null
-        )->run();
+        )->run(
+            laravel_cloud()
+                ? fn ($type, $line) => fwrite($type === 'out' ? STDOUT : STDERR, $line)
+                : fn () => true
+        );
     }
 
     /**
@@ -652,6 +663,8 @@ class Event
     /**
      * Do not allow the event to overlap each other.
      *
+     * The expiration time of the underlying cache lock may be specified in minutes.
+     *
      * @param  int  $expiresAt
      * @return $this
      */
@@ -935,7 +948,26 @@ class Event
      */
     public function mutexName()
     {
+        $mutexNameResolver = $this->mutexNameResolver;
+
+        if (! is_null($mutexNameResolver) && is_callable($mutexNameResolver)) {
+            return $mutexNameResolver($this);
+        }
+
         return 'framework'.DIRECTORY_SEPARATOR.'schedule-'.sha1($this->expression.$this->command);
+    }
+
+    /**
+     * Set the mutex name or name resolver callback.
+     *
+     * @param  \Closure|string  $mutexName
+     * @return $this
+     */
+    public function createMutexNameUsing(Closure|string $mutexName)
+    {
+        $this->mutexNameResolver = is_string($mutexName) ? fn () => $mutexName : $mutexName;
+
+        return $this;
     }
 
     /**

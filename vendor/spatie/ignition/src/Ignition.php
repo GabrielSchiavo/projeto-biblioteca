@@ -14,7 +14,6 @@ use Spatie\FlareClient\FlareMiddleware\FlareMiddleware;
 use Spatie\FlareClient\Report;
 use Spatie\Ignition\Config\IgnitionConfig;
 use Spatie\Ignition\Contracts\HasSolutionsForThrowable;
-use Spatie\Ignition\Contracts\ProvidesSolution;
 use Spatie\Ignition\Contracts\SolutionProviderRepository as SolutionProviderRepositoryContract;
 use Spatie\Ignition\ErrorPage\ErrorPageViewModel;
 use Spatie\Ignition\ErrorPage\Renderer;
@@ -50,14 +49,19 @@ class Ignition
     /** @var ArrayObject<int, callable(Throwable): mixed> */
     protected ArrayObject $documentationLinkResolvers;
 
+    protected string $customHtmlHead = '';
+
+    protected string $customHtmlBody = '';
+
     public static function make(): self
     {
         return new self();
     }
 
-    public function __construct()
-    {
-        $this->flare = Flare::make();
+    public function __construct(
+        ?Flare $flare = null,
+    ) {
+        $this->flare = $flare ?? Flare::make();
 
         $this->ignitionConfig = IgnitionConfig::loadFromConfigFile();
 
@@ -151,7 +155,7 @@ class Ignition
     }
 
     /**
-     * @param array<int, ProvidesSolution|class-string<ProvidesSolution>> $solutionProviders
+     * @param array<int, HasSolutionsForThrowable|class-string<HasSolutionsForThrowable>> $solutionProviders
      *
      * @return $this
      */
@@ -234,14 +238,14 @@ class Ignition
         return $this;
     }
 
-    public function register(): self
+    public function register(?int $errorLevels = null): self
     {
-        error_reporting(-1);
+        error_reporting($errorLevels ?? -1);
 
-        /** @phpstan-ignore-next-line  */
-        set_error_handler([$this, 'renderError']);
+        $errorLevels
+            ? set_error_handler([$this, 'renderError'], $errorLevels)
+            : set_error_handler([$this, 'renderError']);
 
-        /** @phpstan-ignore-next-line  */
         set_exception_handler([$this, 'handleException']);
 
         return $this;
@@ -264,34 +268,82 @@ class Ignition
         int $line = 0,
         array $context = []
     ): void {
+        if(error_reporting() === (E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR | E_PARSE)) {
+            // This happens when PHP version is >=8 and we caught an error that was suppressed with the "@" operator
+            // See the first warning box in https://www.php.net/manual/en/language.operators.errorcontrol.php
+            return;
+        }
+
         throw new ErrorException($message, 0, $level, $file, $line);
     }
 
+    /**
+     * This is the main entry point for the framework agnostic Ignition package.
+     * Displays the Ignition page and optionally sends a report to Flare.
+     */
     public function handleException(Throwable $throwable): Report
     {
         $this->setUpFlare();
 
-        $report = $this->flare->createReport($throwable);
+        $report = $this->createReport($throwable);
 
         if ($this->shouldDisplayException && $this->inProductionEnvironment !== true) {
             $this->renderException($throwable, $report);
         }
 
         if ($this->flare->apiTokenSet() && $this->inProductionEnvironment !== false) {
-            $this->flare->report($throwable);
+            $this->flare->report($throwable, report: $report);
         }
 
         return $report;
     }
 
-    /** @return array<class-string<HasSolutionsForThrowable>> */
-    protected function getDefaultSolutionProviders(): array
+    /**
+     * This is the main entrypoint for laravel-ignition. It only renders the exception.
+     * Sending the report to Flare is handled in the laravel-ignition log handler.
+     */
+    public function renderException(Throwable $throwable, ?Report $report = null): void
     {
-        return [
-            BadMethodCallSolutionProvider::class,
-            MergeConflictSolutionProvider::class,
-            UndefinedPropertySolutionProvider::class,
-        ];
+        $this->setUpFlare();
+
+        $report ??= $this->createReport($throwable);
+
+        $viewModel = new ErrorPageViewModel(
+            $throwable,
+            $this->ignitionConfig,
+            $report,
+            $this->solutionProviderRepository->getSolutionsForThrowable($throwable),
+            $this->solutionTransformerClass,
+            $this->customHtmlHead,
+            $this->customHtmlBody,
+        );
+
+        (new Renderer())->render(['viewModel' => $viewModel], self::viewPath('errorPage'));
+    }
+
+    public static function viewPath(string $viewName): string
+    {
+        return __DIR__ . "/../resources/views/{$viewName}.php";
+    }
+
+    /**
+     * Add custom HTML which will be added to the head tag of the error page.
+     */
+    public function addCustomHtmlToHead(string $html): self
+    {
+        $this->customHtmlHead .= $html;
+
+        return $this;
+    }
+
+    /**
+     * Add custom HTML which will be added to the body tag of the error page.
+     */
+    public function addCustomHtmlToBody(string $html): self
+    {
+        $this->customHtmlBody .= $html;
+
+        return $this;
     }
 
     protected function setUpFlare(): self
@@ -313,16 +365,18 @@ class Ignition
         return $this;
     }
 
-    public function renderException(Throwable $throwable, Report $report): void
+    /** @return array<class-string<HasSolutionsForThrowable>> */
+    protected function getDefaultSolutionProviders(): array
     {
-        $viewModel = new ErrorPageViewModel(
-            $throwable,
-            $this->ignitionConfig,
-            $report,
-            $this->solutionProviderRepository->getSolutionsForThrowable($throwable),
-            $this->solutionTransformerClass,
-        );
+        return [
+            BadMethodCallSolutionProvider::class,
+            MergeConflictSolutionProvider::class,
+            UndefinedPropertySolutionProvider::class,
+        ];
+    }
 
-        (new Renderer())->render(['viewModel' => $viewModel]);
+    protected function createReport(Throwable $throwable): Report
+    {
+        return $this->flare->createReport($throwable);
     }
 }

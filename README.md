@@ -33,9 +33,17 @@ Após baixar o projeto, você pode abrir com o Visual Studio Code. Para o projet
 * Composer - Versão >=2.2.6
 * Banco de Dados MySQL
 
-Na pasta de instalação do PHP edite o arquivo "php.ini", neste arquivo descomente a linha que diz "extension=fileinfo" removendo o ";" da frente.
+`Configurando o projeto:`
+1. Na pasta de instalação do PHP edite o arquivo "php.ini", neste arquivo descomente a linha que diz "extension=fileinfo" removendo o ";" da frente.
+   
+2. `Atualizando dependências`. Na raiz do projeto abra um terminal e execute:
+   ```bash
+    composer update
+    ```
+    
 
-Após configurar todas essas ferramentas, abra o arquivo .env, localizado na raiz do projeto e altere as configurações de "DB_CONNECTION" para as configurações do seu MySQL. Exclua a pasta "storage", localizada em /public. Depois abra um terminal na raiz do projeto e execute os seguintes comandos:
+
+3. Após configurar todas essas ferramentas, abra o arquivo .env, localizado na raiz do projeto e altere as configurações de "DB_CONNECTION" para as configurações do seu MySQL. Exclua a pasta "storage", localizada em /public. Depois abra um terminal na raiz do projeto e execute os seguintes comandos:
 ```bash
 php artisan migrate
 ```
@@ -43,7 +51,7 @@ php artisan migrate
 php artisan storage:link
 ```
 
-Agora o projeto está pronto para ser iniciado. Para isso execute no terminal o seguinte comando:
+1. Agora o projeto está pronto para ser iniciado. Para isso execute no terminal o seguinte comando:
 ```bash
 php artisan serve
 ```

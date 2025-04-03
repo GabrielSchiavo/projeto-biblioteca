@@ -29,6 +29,9 @@ use Symfony\Component\DependencyInjection\TypedReference;
  */
 class AddConsoleCommandPass implements CompilerPassInterface
 {
+    /**
+     * @return void
+     */
     public function process(ContainerBuilder $container)
     {
         $commandServices = $container->findTaggedServiceIds('console.command', true);
@@ -50,7 +53,7 @@ class AddConsoleCommandPass implements CompilerPassInterface
                 if (!$r->isSubclassOf(Command::class)) {
                     throw new InvalidArgumentException(sprintf('The service "%s" tagged "%s" must be a subclass of "%s".', $id, 'console.command', Command::class));
                 }
-                $aliases = $class::getDefaultName();
+                $aliases = str_replace('%', '%%', $class::getDefaultName() ?? '');
             }
 
             $aliases = explode('|', $aliases ?? '');
@@ -87,7 +90,7 @@ class AddConsoleCommandPass implements CompilerPassInterface
                     $lazyCommandMap[$tag['command']] = $id;
                 }
 
-                $description = $description ?? $tag['description'] ?? null;
+                $description ??= $tag['description'] ?? null;
             }
 
             $definition->addMethodCall('setName', [$commandName]);
@@ -107,7 +110,7 @@ class AddConsoleCommandPass implements CompilerPassInterface
                 if (!$r->isSubclassOf(Command::class)) {
                     throw new InvalidArgumentException(sprintf('The service "%s" tagged "%s" must be a subclass of "%s".', $id, 'console.command', Command::class));
                 }
-                $description = $class::getDefaultDescription();
+                $description = str_replace('%', '%%', $class::getDefaultDescription() ?? '');
             }
 
             if ($description) {

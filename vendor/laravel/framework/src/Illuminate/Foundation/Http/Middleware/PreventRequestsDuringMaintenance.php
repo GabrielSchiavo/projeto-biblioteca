@@ -19,7 +19,7 @@ class PreventRequestsDuringMaintenance
     /**
      * The URIs that should be accessible while maintenance mode is enabled.
      *
-     * @var array
+     * @var array<int, string>
      */
     protected $except = [];
 
@@ -111,7 +111,7 @@ class PreventRequestsDuringMaintenance
      */
     protected function inExceptArray($request)
     {
-        foreach ($this->except as $except) {
+        foreach ($this->getExcludedPaths() as $except) {
             if ($except !== '/') {
                 $except = trim($except, '/');
             }

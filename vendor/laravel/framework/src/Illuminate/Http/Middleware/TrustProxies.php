@@ -10,7 +10,7 @@ class TrustProxies
     /**
      * The trusted proxies for the application.
      *
-     * @var array|string|null
+     * @var array<int, string>|string|null
      */
     protected $proxies;
 
@@ -47,7 +47,11 @@ class TrustProxies
      */
     protected function setTrustedProxyIpAddresses(Request $request)
     {
-        $trustedIps = $this->proxies();
+        $trustedIps = $this->proxies() ?: config('trustedproxy.proxies');
+
+        if (is_null($trustedIps) && laravel_cloud()) {
+            $trustedIps = '*';
+        }
 
         if ($trustedIps === '*' || $trustedIps === '**') {
             return $this->setTrustedProxyIpAddressesToTheCallingIp($request);
