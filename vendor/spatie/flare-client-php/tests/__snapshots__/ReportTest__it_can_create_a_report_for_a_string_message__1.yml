@@ -1,0 +1,25 @@
+notifier: 'Flare Client'
+language: PHP
+framework_version: null
+language_version: 7.3.2
+exception_class: Log
+seen_at: 1546305825
+message: 'this is a message'
+glows: {  }
+solutions: {  }
+documentation_links: {  }
+stacktrace: {  }
+context:
+    arguments:
+        - '[phpunit arguments removed]'
+    env:
+        php_version: 7.3.2
+stage: null
+message_level: null
+open_frame_index: 0
+application_path: null
+application_version: null
+tracking_uuid: fake-uuid
+handled: null
+overridden_grouping: null
+uuid: fake-uuid
